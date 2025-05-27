@@ -33,36 +33,6 @@ module.exports = __toCommonJS(index_exports);
 
 // src/discovery/evm-wallets.ts
 var import_mipd = require("mipd");
-async function EvmWindowObjectWithStarknetKeys() {
-  let Wallets = [];
-  const store = (0, import_mipd.createStore)();
-  const providers = store.getProviders();
-  for (const wallet of providers) {
-    if (wallet.info.rdns === "com.bitget.web3") {
-      wallet.info.name = "Bitget Wallet via Rosettanet";
-    } else if (wallet.info.rdns === "com.okex.wallet") {
-      wallet.info.name = "OKX Wallet via Rosettanet";
-    }
-    const walletWithStarknetKeys = {
-      ...wallet.provider,
-      id: wallet.info.name,
-      name: wallet.info.name,
-      icon: wallet.info.icon,
-      version: "1.0.0",
-      on: wallet.provider.on,
-      off: wallet.provider.removeListener
-    };
-    Wallets.push(walletWithStarknetKeys);
-  }
-  return Wallets;
-}
-__name(EvmWindowObjectWithStarknetKeys, "EvmWindowObjectWithStarknetKeys");
-var ETHEREUM_WALLET_KEYS = ["sendAsync", "send", "request"];
-function isEthereumWindowObject(wallet) {
-  if (typeof wallet !== "object" || wallet === null) return false;
-  return ETHEREUM_WALLET_KEYS.every((key) => key in wallet);
-}
-__name(isEthereumWindowObject, "isEthereumWindowObject");
 
 // src/wallet-standard/evm-injected-wallet.ts
 var import_features2 = require("@wallet-standard/features");
@@ -85,6 +55,15 @@ __name(isEVMWallet, "isEVMWallet");
 // src/wallet-standard/evm-injected-wallet.ts
 var import_starknet = require("starknet");
 var import_rosettanet = require("rosettanet");
+
+// src/utils/validateCallParams.ts
+var validateCallParams = /* @__PURE__ */ __name((value) => {
+  return Array.isArray(value) && value.every(
+    (item) => typeof item === "object" && item !== null && !Array.isArray(item) && "contractAddress" in item && "entrypoint" in item && "calldata" in item
+  );
+}, "validateCallParams");
+
+// src/wallet-standard/evm-injected-wallet.ts
 var walletToEthereumRpcMap = {
   wallet_getPermissions: void 0,
   wallet_requestAccounts: "eth_requestAccounts",
@@ -160,7 +139,6 @@ var EthereumInjectedWallet = class {
     return [];
   }
   #connect = /* @__PURE__ */ __name(async () => {
-    console.log("EVM Connect called");
     if (!this.#account) {
       const accounts = await this.#request({
         type: "wallet_requestAccounts"
@@ -239,13 +217,12 @@ var EthereumInjectedWallet = class {
   }
   #request = /* @__PURE__ */ __name(async (call) => {
     const mappedMethod = walletToEthereumRpcMap[call.type];
-    console.log("EVM Request:", call.type, mappedMethod, call.params);
     if (!mappedMethod) {
       throw new Error(`Unsupported request type: ${call.type}`);
     }
     if (mappedMethod === "eth_sendTransaction" && call.params) {
-      if (Array.isArray(call.params) === false) {
-        throw new Error("Invalid calls parameter. Expected an array of calls.");
+      if (validateCallParams(call.params) === false) {
+        throw new Error("Invalid call parameter. Expected an array of objects. Rosettanet only supports multicall.");
       }
       const arrayCalls = call.params.map((item) => [
         item.contractAddress,
@@ -271,17 +248,12 @@ var EthereumInjectedWallet = class {
         data: txData,
         value: "0x0"
       };
-      const ethPayload2 = {
+      const ethPayload = {
         method: mappedMethod,
         params: [txObject]
       };
-      return this.injected.request(ethPayload2);
+      return this.injected.request(ethPayload);
     }
-    const ethPayload = {
-      method: mappedMethod,
-      params: call.params ? [call.params] : []
-    };
-    console.log("EVM Payload:", ethPayload);
     return this.injected.request({ method: mappedMethod, params: call.params ? [call.params] : [] });
   }, "#request");
   async #getEthereumChain() {
@@ -296,6 +268,38 @@ var EthereumInjectedWallet = class {
     return chain;
   }
 };
+
+// src/discovery/evm-wallets.ts
+async function EvmWindowObjectWithStarknetKeys() {
+  let Wallets = [];
+  const store = (0, import_mipd.createStore)();
+  const providers = store.getProviders();
+  for (const wallet of providers) {
+    if (wallet.info.rdns === "com.bitget.web3") {
+      wallet.info.name = "Bitget Wallet via Rosettanet";
+    } else if (wallet.info.rdns === "com.okex.wallet") {
+      wallet.info.name = "OKX Wallet via Rosettanet";
+    }
+    const walletWithStarknetKeys = {
+      ...wallet.provider,
+      id: wallet.info.name,
+      name: wallet.info.name,
+      icon: wallet.info.icon,
+      version: "1.0.0",
+      on: wallet.provider.on,
+      off: wallet.provider.removeListener
+    };
+    Wallets.push(new EthereumInjectedWallet(walletWithStarknetKeys));
+  }
+  return Wallets;
+}
+__name(EvmWindowObjectWithStarknetKeys, "EvmWindowObjectWithStarknetKeys");
+var ETHEREUM_WALLET_KEYS = ["sendAsync", "send", "request"];
+function isEthereumWindowObject(wallet) {
+  if (typeof wallet !== "object" || wallet === null) return false;
+  return ETHEREUM_WALLET_KEYS.every((key) => key in wallet);
+}
+__name(isEthereumWindowObject, "isEthereumWindowObject");
 
 // src/types/index.ts
 var ETHEREUM_CHAIN_PREFIX = "eip155:";

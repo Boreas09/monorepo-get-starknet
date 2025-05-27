@@ -1,6 +1,7 @@
 import { StarknetWindowObject } from '@starknet-io/types-js';
 import { createStore } from 'mipd';
 import { EthereumProvider } from '../types';
+import { EthereumInjectedWallet } from '../wallet-standard/evm-injected-wallet';
 
 export async function EvmWindowObjectWithStarknetKeys() {
   let Wallets = [];
@@ -25,9 +26,9 @@ export async function EvmWindowObjectWithStarknetKeys() {
       version: "1.0.0",
       on: wallet.provider.on,
       off: wallet.provider.removeListener,
-    };
+    } as StarknetWindowObject;
 
-    Wallets.push(walletWithStarknetKeys);
+    Wallets.push(new EthereumInjectedWallet(walletWithStarknetKeys));
   }
 
   return Wallets;

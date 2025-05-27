@@ -24,6 +24,7 @@ import {
 import { StarknetChain, EthereumChain } from '../types';
 import { hash } from 'starknet';
 import { prepareMulticallCalldata } from 'rosettanet';
+import { validateCallParams } from '../utils/validateCallParams';
 
 const walletToEthereumRpcMap: Record<keyof RpcTypeToMessageMap, string | undefined> = {
   wallet_getPermissions: undefined,
@@ -108,7 +109,6 @@ export class EthereumInjectedWallet implements EthereumWalletWithStarknetFeature
   }
 
   #connect: StandardConnectMethod = async () => {
-    console.log('EVM Connect called');
     if (!this.#account) {
       const accounts = await this.#request({
         type: 'wallet_requestAccounts',
@@ -222,18 +222,16 @@ export class EthereumInjectedWallet implements EthereumWalletWithStarknetFeature
   ): Promise<RpcTypeToMessageMap[T]['result']> => {
     const mappedMethod = walletToEthereumRpcMap[call.type];
 
-    console.log('EVM Request:', call.type, mappedMethod, call.params);
-
     if (!mappedMethod) {
       throw new Error(`Unsupported request type: ${call.type}`);
     }
 
     if (mappedMethod === 'eth_sendTransaction' && call.params) {
-      if (Array.isArray(call.params) === false) {
-        throw new Error('Invalid calls parameter. Expected an array of calls.');
+      if (validateCallParams(call.params) === false) {
+        throw new Error('Invalid call parameter. Expected an array of objects. Rosettanet only supports multicall.');
       }
 
-      const arrayCalls: [string, string, string][] = call.params.map((item) => [
+      const arrayCalls: [string, string, string[]][] = call.params.map((item) => [
         item.contractAddress,
         item.entrypoint,
         item.calldata,
@@ -272,15 +270,6 @@ export class EthereumInjectedWallet implements EthereumWalletWithStarknetFeature
 
       return (this.injected.request as any)(ethPayload);
     }
-
-    const ethPayload = {
-      method: mappedMethod,
-      params: call.params ? [call.params] : [],
-    };
-
-    console.log('EVM Payload:', ethPayload);
-
-    // Call the injected EVM provider's request method directly
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this.injected.request as any)({ method: mappedMethod, params: call.params ? [call.params] : [] });
   };
