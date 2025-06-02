@@ -18,3 +18,9 @@ export type ChainId = `0x${string}`;
 export type EthereumChain = `${typeof ETHEREUM_CHAIN_PREFIX}${string}`;
 
 export type StarknetChain = `${typeof STARKNET_CHAIN_PREFIX}${ChainId}`;
+
+export interface CallObject {
+  contractAddress: string;
+  entrypoint: string;
+  calldata: string[];
+}

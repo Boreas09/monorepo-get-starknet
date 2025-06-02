@@ -299,6 +299,200 @@ export default function GetStarknetV5() {
     }
   };
 
+  const signMessage = async wallet => {
+    try {
+      setLoading(true);
+      if (!wallet.accounts[0].address) {
+        toast({
+          title: 'Please Connect Your Wallet With Get-Starknet V5.',
+          status: 'error',
+          duration: 9000,
+          isClosable: true,
+        });
+        setLoading(false);
+        return;
+      }
+
+      const ethMSG = {
+        types: {
+          EIP712Domain: [
+            {
+              name: 'name',
+              type: 'string',
+            },
+            {
+              name: 'version',
+              type: 'string',
+            },
+            {
+              name: 'chainId',
+              type: 'uint256',
+            },
+            {
+              name: 'verifyingContract',
+              type: 'address',
+            },
+          ],
+          Person: [
+            {
+              name: 'name',
+              type: 'string',
+            },
+            {
+              name: 'wallet',
+              type: 'address',
+            },
+          ],
+          Mail: [
+            {
+              name: 'from',
+              type: 'Person',
+            },
+            {
+              name: 'to',
+              type: 'Person',
+            },
+            {
+              name: 'contents',
+              type: 'string',
+            },
+          ],
+        },
+        primaryType: 'Mail',
+        domain: {
+          name: 'Ether Mail',
+          version: '1',
+          chainId: 1381192787,
+          verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+        },
+        message: {
+          from: {
+            name: 'Cow',
+            wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+          },
+          to: {
+            name: 'Bob',
+            wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+          },
+          contents: 'Hello, Bob!',
+        },
+      };
+
+      const snMSG = {
+        domain: {
+          name: 'DappLand',
+          chainId: 1381192787,
+          version: '1.0.2',
+        },
+        message: {
+          name: 'MonKeyCollection',
+          value: 2312,
+          // do not use BigInt type if message sent to a web browser
+        },
+        primaryType: 'Simple',
+        types: {
+          Simple: [
+            {
+              name: 'name',
+              type: 'string',
+            },
+            {
+              name: 'value',
+              type: 'u128',
+            },
+          ],
+          EIP712Domain: [
+            {
+              name: 'name',
+              type: 'string',
+            },
+            {
+              name: 'chainId',
+              type: 'string',
+            },
+            {
+              name: 'version',
+              type: 'string',
+            },
+          ],
+        },
+      };
+
+      const response = await wallet.features['starknet:walletApi'].request({
+        type: 'wallet_signTypedData',
+        params: JSON.stringify(snMSG),
+      });
+
+      console.log('Transaction sent:', response);
+      setTransactions(prevData => [...prevData, response]);
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Error',
+        description: JSON.stringify(e),
+        status: 'error',
+        duration: 9000,
+        isClosable: true,
+        containerStyle: {
+          height: '80px',
+        },
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const watchAsset = async wallet => {
+    try {
+      setLoading(true);
+      if (!wallet.accounts[0].address) {
+        toast({
+          title: 'Please Connect Your Wallet With Get-Starknet V5.',
+          status: 'error',
+          duration: 9000,
+          isClosable: true,
+        });
+        setLoading(false);
+        return;
+      }
+
+      const tokenAddress = '0xb5e1278663de249f8580ec51b6b61739bd906215'; // Replace with your token's contract address
+      const tokenSymbol = 'ETH'; // Replace with your token's symbol
+      const tokenDecimals = 18; // Replace with your token's decimals
+
+      const asset = {
+        type: 'ERC20',
+        options: {
+          address: tokenAddress,
+          symbol: tokenSymbol,
+          decimals: tokenDecimals,
+        },
+      };
+
+      const response = await wallet.features['starknet:walletApi'].request({
+        type: 'wallet_watchAsset',
+        params: asset,
+      });
+
+      console.log('Transaction sent:', response);
+      setTransactions(prevData => [...prevData, response]);
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Error',
+        description: JSON.stringify(e),
+        status: 'error',
+        duration: 9000,
+        isClosable: true,
+        containerStyle: {
+          height: '80px',
+        },
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container maxW="3xl" overflow={'hidden'}>
       <Text fontSize={'lg'} fontWeight={'bold'}>
@@ -373,6 +567,20 @@ export default function GetStarknetV5() {
                     }}
                   >
                     Send 1 STRK
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      signMessage(wallet);
+                    }}
+                  >
+                    Sign
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      watchAsset(wallet);
+                    }}
+                  >
+                    watchAsset
                   </Button>
                 </Stack>
               </Stack>

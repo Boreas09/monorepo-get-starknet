@@ -30,16 +30,42 @@ function isEVMWallet(wallet) {
 }
 __name(isEVMWallet, "isEVMWallet");
 
-// src/wallet-standard/evm-injected-wallet.ts
-import { hash } from "starknet";
-import { prepareMulticallCalldata } from "rosettanet";
-
 // src/utils/validateCallParams.ts
 var validateCallParams = /* @__PURE__ */ __name((value) => {
   return Array.isArray(value) && value.every(
     (item) => typeof item === "object" && item !== null && !Array.isArray(item) && "contractAddress" in item && "entrypoint" in item && "calldata" in item
   );
 }, "validateCallParams");
+
+// src/utils/createEthTxObject.ts
+import { hash } from "starknet";
+import { prepareMulticallCalldata } from "rosettanet";
+function createEthTxObject(address, calls) {
+  const arrayCalls = calls.map(
+    (item) => [item.contractAddress, item.entrypoint, item.calldata]
+  );
+  const txCalls = [].concat(arrayCalls).map((it) => {
+    const entryPointValue = it[1];
+    const entryPoint = entryPointValue.startsWith("0x") ? entryPointValue : hash.getSelectorFromName(entryPointValue);
+    return {
+      contract_address: it[0],
+      entry_point: entryPoint,
+      calldata: it[2]
+    };
+  });
+  const params = {
+    calls: txCalls
+  };
+  const txData = prepareMulticallCalldata(params.calls);
+  const txObject = {
+    from: address,
+    to: "0x0000000000000000000000004645415455524553",
+    data: txData,
+    value: "0x0"
+  };
+  return txObject;
+}
+__name(createEthTxObject, "createEthTxObject");
 
 // src/wallet-standard/evm-injected-wallet.ts
 var walletToEthereumRpcMap = {
@@ -52,7 +78,7 @@ var walletToEthereumRpcMap = {
   wallet_deploymentData: void 0,
   wallet_addInvokeTransaction: "eth_sendTransaction",
   wallet_addDeclareTransaction: void 0,
-  wallet_signTypedData: "eth_signTypedData_v4",
+  wallet_signTypedData: "personal_sign",
   wallet_supportedSpecs: void 0,
   wallet_supportedWalletApi: void 0
 };
@@ -202,36 +228,28 @@ var EthereumInjectedWallet = class {
       if (validateCallParams(call.params) === false) {
         throw new Error("Invalid call parameter. Expected an array of objects. Rosettanet only supports multicall.");
       }
-      const arrayCalls = call.params.map((item) => [
-        item.contractAddress,
-        item.entrypoint,
-        item.calldata
-      ]);
-      const txCalls = [].concat(arrayCalls).map((it) => {
-        const entryPointValue = it[1];
-        const entryPoint = entryPointValue.startsWith("0x") ? entryPointValue : hash.getSelectorFromName(entryPointValue);
-        return {
-          contract_address: it[0],
-          entry_point: entryPoint,
-          calldata: it[2]
-        };
-      });
-      const params = {
-        calls: txCalls
-      };
-      const txData = prepareMulticallCalldata(params.calls);
-      const txObject = {
-        from: this.#account?.address,
-        to: "0x0000000000000000000000004645415455524553",
-        data: txData,
-        value: "0x0"
-      };
+      const txObject = createEthTxObject(this.#account?.address, call.params);
       const ethPayload = {
         method: mappedMethod,
         params: [txObject]
       };
       return this.injected.request(ethPayload);
     }
+    if (mappedMethod === "personal_sign" && call.params) {
+      const ethPayload = {
+        method: mappedMethod,
+        params: [this.#account?.address, call.params]
+      };
+      return this.injected.request(ethPayload);
+    }
+    if (mappedMethod === "wallet_watchAsset" && call.params) {
+      const ethPayload = {
+        method: mappedMethod,
+        params: call.params
+      };
+      return this.injected.request(ethPayload);
+    }
+    console.log("Requesting:", mappedMethod, call.params);
     return this.injected.request({ method: mappedMethod, params: call.params ? [call.params] : [] });
   }, "#request");
   async #getEthereumChain() {

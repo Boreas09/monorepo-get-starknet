@@ -1,4 +1,4 @@
-import type { Wallet, WalletAccount, WalletWithFeatures } from '@wallet-standard/base';
+import type { Wallet, WalletAccount } from '@wallet-standard/base';
 import {
   StandardConnect,
   type StandardConnectMethod,
@@ -10,7 +10,7 @@ import {
   type StandardEventsListeners,
 } from '@wallet-standard/features';
 import {
-  RequestFn,
+
   StarknetWindowObject,
   RpcTypeToMessageMap,
   RpcMessage,
@@ -21,10 +21,11 @@ import {
   StarknetFeatures,
   StarknetWalletApi,
 } from './features';
-import { StarknetChain, EthereumChain } from '../types';
+import { EthereumChain } from '../types';
 import { hash } from 'starknet';
 import { prepareMulticallCalldata } from 'rosettanet';
 import { validateCallParams } from '../utils/validateCallParams';
+import { createEthTxObject } from '../utils/createEthTxObject';
 
 const walletToEthereumRpcMap: Record<keyof RpcTypeToMessageMap, string | undefined> = {
   wallet_getPermissions: undefined,
@@ -36,7 +37,7 @@ const walletToEthereumRpcMap: Record<keyof RpcTypeToMessageMap, string | undefin
   wallet_deploymentData: undefined,
   wallet_addInvokeTransaction: 'eth_sendTransaction',
   wallet_addDeclareTransaction: undefined,
-  wallet_signTypedData: 'eth_signTypedData_v4',
+  wallet_signTypedData: 'personal_sign',
   wallet_supportedSpecs: undefined,
   wallet_supportedWalletApi: undefined,
 };
@@ -231,37 +232,7 @@ export class EthereumInjectedWallet implements EthereumWalletWithStarknetFeature
         throw new Error('Invalid call parameter. Expected an array of objects. Rosettanet only supports multicall.');
       }
 
-      const arrayCalls: [string, string, string[]][] = call.params.map((item) => [
-        item.contractAddress,
-        item.entrypoint,
-        item.calldata,
-      ]);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const txCalls = [].concat(arrayCalls as any).map((it) => {
-        const entryPointValue = it[1] as string;
-        const entryPoint = entryPointValue.startsWith('0x')
-          ? entryPointValue
-          : hash.getSelectorFromName(entryPointValue);
-
-        return {
-          contract_address: it[0],
-          entry_point: entryPoint,
-          calldata: it[2],
-        };
-      });
-
-      const params = {
-        calls: txCalls,
-      };
-
-      const txData = prepareMulticallCalldata(params.calls);
-
-      const txObject = {
-        from: this.#account?.address,
-        to: '0x0000000000000000000000004645415455524553',
-        data: txData,
-        value: '0x0',
-      };
+      const txObject = createEthTxObject(this.#account?.address, call.params);
 
       const ethPayload = {
         method: mappedMethod,
@@ -270,6 +241,24 @@ export class EthereumInjectedWallet implements EthereumWalletWithStarknetFeature
 
       return (this.injected.request as any)(ethPayload);
     }
+
+    if (mappedMethod === 'personal_sign' && call.params) {
+      const ethPayload = {
+        method: mappedMethod,
+        params: [this.#account?.address, call.params],
+      }
+      return (this.injected.request as any)(ethPayload)
+    }
+
+    if (mappedMethod === 'wallet_watchAsset' && call.params) {
+      const ethPayload = {
+        method: mappedMethod,
+        params: call.params,
+      }
+      return (this.injected.request as any)(ethPayload)
+    }
+
+    console.log('Requesting:', mappedMethod, call.params);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this.injected.request as any)({ method: mappedMethod, params: call.params ? [call.params] : [] });
   };

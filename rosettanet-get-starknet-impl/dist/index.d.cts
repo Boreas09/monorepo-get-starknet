@@ -16,6 +16,11 @@ declare const STARKNET_CHAIN_PREFIX = "starknet:";
 type ChainId = `0x${string}`;
 type EthereumChain = `${typeof ETHEREUM_CHAIN_PREFIX}${string}`;
 type StarknetChain = `${typeof STARKNET_CHAIN_PREFIX}${ChainId}`;
+interface CallObject {
+    contractAddress: string;
+    entrypoint: string;
+    calldata: string[];
+}
 
 declare const StarknetWalletApi = "starknet:walletApi";
 type StarknetWalletApiVersion = '1.0.0';
@@ -48,4 +53,4 @@ declare class EthereumInjectedWallet implements EthereumWalletWithStarknetFeatur
 declare function EvmWindowObjectWithStarknetKeys(): Promise<EthereumInjectedWallet[]>;
 declare function isEthereumWindowObject(wallet: unknown): wallet is EthereumProvider;
 
-export { type ChainId, ETHEREUM_CHAIN_PREFIX, type EthereumChain, EthereumInjectedWallet, type EthereumProvider, type EthereumWalletWithStarknetFeatures, EvmWindowObjectWithStarknetKeys, STARKNET_CHAIN_PREFIX, type StarknetChain, type StarknetFeatures, StarknetWalletApi, type StarknetWalletApiVersion, type StarknetWalletRequestFeature, isEVMWallet, isEthereumWindowObject };
+export { type CallObject, type ChainId, ETHEREUM_CHAIN_PREFIX, type EthereumChain, EthereumInjectedWallet, type EthereumProvider, type EthereumWalletWithStarknetFeatures, EvmWindowObjectWithStarknetKeys, STARKNET_CHAIN_PREFIX, type StarknetChain, type StarknetFeatures, StarknetWalletApi, type StarknetWalletApiVersion, type StarknetWalletRequestFeature, isEVMWallet, isEthereumWindowObject };
